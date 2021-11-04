@@ -17,13 +17,23 @@ int match_1(char p, char c) {
     if ( c == '\0') return FALSE; 
     return  p ==  c; 
 }
-int match(char * , char * , int); 
+char * match(char * , char * , int); 
 
-int match_q(char * pattern, char * text, int gr_lvl) {
-    return (match_1( * pattern,  * text) && (match(pattern + 2, text + 1, gr_lvl))) || match(pattern + 2, text, gr_lvl); 
+char * match_q(char * pattern, char * text, int gr_lvl) {
+    char *p;
+    //return (match_1( * pattern,  * text) && (match(pattern + 2, text + 1, gr_lvl))) || match(pattern + 2, text, gr_lvl); 
+    if (match_1( * pattern,  * text)) {
+        if ((p = match(pattern + 2, text + 1, gr_lvl)) != NULL) return p;
+    }
+    return match(pattern + 2, text, gr_lvl); 
 }
-int match_s(char * pattern, char * text, int gr_lvl) {
-    return (match_1( * pattern,  * text) && (match(pattern, text + 1, gr_lvl))) || match(pattern + 2, text, gr_lvl); 
+char * match_s(char * pattern, char * text, int gr_lvl) {
+    char *p;
+    //return (match_1( * pattern,  * text) && (match(pattern, text + 1, gr_lvl))) || match(pattern + 2, text, gr_lvl); 
+    if (match_1( * pattern,  * text)) {
+        if ((p=match(pattern, text + 1, gr_lvl)) != NULL) return p;
+    }
+    return match(pattern + 2, text, gr_lvl); 
 }
 char * search_gr_end(char * src, int gr_lvl) {
     char * p = src+1;
@@ -39,35 +49,46 @@ char * search_gr_end(char * src, int gr_lvl) {
     }
     return p; 
 }
-int match_g(char * pattern, char * text, int gr_lvl) {
+char * match_g(char * pattern, char * text, int gr_lvl) {
     // char * group_end = strchr(pattern, ')');
     char * group_end = search_gr_end(pattern, gr_lvl); 
     size_t group_size = group_end - pattern-1;
     char * group_pattern = (char*)malloc(sizeof(group_size));
     char * group_text = (char*)malloc(sizeof(group_size));
-    char * remaind_pattern;
+    char * remaind_pattern,*p;
     memcpy(group_pattern, pattern+1, group_size);
     memcpy(group_text, text, group_size);
     //group_text=text;
     if (*(group_end + 1) =='?') {
         remaind_pattern = group_end+2;
-        return  (match(group_pattern, group_text, gr_lvl) && match(remaind_pattern, text + group_size, gr_lvl)) ||
-                 match(remaind_pattern,text, gr_lvl);
+        //return  (match(group_pattern, group_text, gr_lvl) && match(remaind_pattern, text + group_size, gr_lvl)) ||
+        //         match(remaind_pattern,text, gr_lvl);
+        if (match(group_pattern, group_text, gr_lvl) != NULL) {
+            if ((p=match(remaind_pattern, text + group_size, gr_lvl))!=NULL) return p;
+        }
+        return match(remaind_pattern,text, gr_lvl);
     } else if (*(group_end+1) == '*') {
         remaind_pattern = group_end+2;
-        return  (match(group_pattern, group_text, gr_lvl) && match(pattern, text + group_size, gr_lvl)) ||
-                 match(remaind_pattern,text, gr_lvl);
+        //return  (match(group_pattern, group_text, gr_lvl) && match(pattern, text + group_size, gr_lvl)) ||
+        //         match(remaind_pattern,text, gr_lvl);
+        if (match(group_pattern, group_text, gr_lvl) != NULL) {
+            if ((p = match(pattern, text + group_size, gr_lvl)) != NULL) return p;
+        }
+        return match(remaind_pattern,text, gr_lvl);
     } else {
         remaind_pattern = group_end + 1;
-        return  match(group_pattern, group_text, gr_lvl) && 
-                 match(remaind_pattern, text + group_size, gr_lvl);
-
+        //return  match(group_pattern, group_text, gr_lvl) && 
+        //         match(remaind_pattern, text + group_size, gr_lvl);
+        if (match(group_pattern, group_text, gr_lvl) != NULL) return match(remaind_pattern, text + group_size, gr_lvl);
+        return NULL;
     }
 }
-int match(char * pattern, char * text, int gr_lvl) {
-    if ( * pattern == '\0') return TRUE;
+char * match(char * pattern, char * text, int gr_lvl) {
+    //if ( * pattern == '\0') return TRUE;
+    if ( * pattern == '\0') return text;
     else if ( * pattern == '$' &&  * text  == '\0') {
-        return TRUE; 
+        //return TRUE;
+        return text; 
     } else if ( * (pattern + 1) == '?') {
         return match_q(pattern, text, gr_lvl); 
     } else if ( * (pattern + 1) == '*') {
@@ -76,15 +97,31 @@ int match(char * pattern, char * text, int gr_lvl) {
         return match(pattern + 1, text + 1, gr_lvl);
     } else if ( * pattern == '(') {
         return match_g(pattern, text, gr_lvl + 1);
-    } else return match_1( * pattern,  * text) && match(pattern + 1, text + 1, gr_lvl); 
+    //} else return match_1( * pattern,  * text) && match(pattern + 1, text + 1, gr_lvl); 
+    } else if (match_1( * pattern,  * text)) return match(pattern + 1, text + 1, gr_lvl); 
+    else return NULL;
 }
-int search(char * pattern, char * text) {
-    int i = 0; 
+
+typedef struct {
+    char * top;
+    char * end;
+} pos;
+pos * new_pos(char * top, char * end) {
+    pos * m_pos = (pos*)malloc(sizeof(pos));
+    m_pos->top = top;
+    m_pos->end = end ;
+    return m_pos;
+}
+pos * search(char * pattern, char * text) {
+    char * p; 
     if ( * pattern == '^') {
-        return match(pattern + 1, text, 0);
+        //return match(pattern + 1, text, 0);
+        if ((p = match(pattern + 1, text, 0)) != NULL) return new_pos(text,p);
+        else return NULL;
     } else {
         while  (* text != '\0') {
-            if (match(pattern, text ++ , 0)) return TRUE;
+            //if (match(pattern, text ++ , 0)) return TRUE;
+            if (p = match(pattern, text ++ , 0)) return new_pos(text-1,p);
         }
         return FALSE;             
     }   
@@ -92,6 +129,9 @@ int search(char * pattern, char * text) {
 int main(int argc, char * argv[]) {
     char * pattern = argv[1]; 
     char * text = argv[2]; 
-     printf("%d\n", search(pattern, text)); 
-    // printf("%d\n", match(pattern, text)); 
+    char * match_top,*match_end;
+    pos * m_pos = search(pattern,text);
+    //printf("%d\n", search(pattern, text));
+    if (m_pos==NULL) printf("Missed\n");
+    else printf("match in %ld to %ld\n",m_pos->top - text,m_pos->end - text);
 }
