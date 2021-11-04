@@ -10,6 +10,7 @@
 // * 前の文字と0個以上一致
 // . 任意の文字と1個一致
 // ^ 文字の先頭で一致
+// | 並列選択
 // $ 文字の末尾で一致
 // () グループ化
 int match_1(char p, char c) {
@@ -57,38 +58,62 @@ char * match_g(char * pattern, char * text, int gr_lvl) {
     char * group_text = (char*)malloc(sizeof(group_size));
     char * remaind_pattern,*p;
     memcpy(group_pattern, pattern+1, group_size);
-    memcpy(group_text, text, group_size);
+    //memcpy(group_text, text, group_size);
     //group_text=text;
     if (*(group_end + 1) =='?') {
         remaind_pattern = group_end+2;
         //return  (match(group_pattern, group_text, gr_lvl) && match(remaind_pattern, text + group_size, gr_lvl)) ||
         //         match(remaind_pattern,text, gr_lvl);
-        if (match(group_pattern, group_text, gr_lvl) != NULL) {
-            if ((p=match(remaind_pattern, text + group_size, gr_lvl))!=NULL) return p;
+        if ((p=match(group_pattern, text, gr_lvl)) != NULL) {
+            if ((p=match(remaind_pattern, p, gr_lvl))!=NULL) return p;
         }
         return match(remaind_pattern,text, gr_lvl);
     } else if (*(group_end+1) == '*') {
         remaind_pattern = group_end+2;
         //return  (match(group_pattern, group_text, gr_lvl) && match(pattern, text + group_size, gr_lvl)) ||
         //         match(remaind_pattern,text, gr_lvl);
-        if (match(group_pattern, group_text, gr_lvl) != NULL) {
-            if ((p = match(pattern, text + group_size, gr_lvl)) != NULL) return p;
+        if ((p=match(group_pattern, text, gr_lvl)) != NULL) {
+            if ((p = match(pattern, p, gr_lvl)) != NULL) return p;
         }
         return match(remaind_pattern,text, gr_lvl);
     } else {
         remaind_pattern = group_end + 1;
         //return  match(group_pattern, group_text, gr_lvl) && 
         //         match(remaind_pattern, text + group_size, gr_lvl);
-        if (match(group_pattern, group_text, gr_lvl) != NULL) return match(remaind_pattern, text + group_size, gr_lvl);
+        if ((p=match(group_pattern, text, gr_lvl)) != NULL) return match(remaind_pattern, p, gr_lvl);
         return NULL;
     }
 }
+char * search_1st_bar(char *src, int gr_lvl) {
+    // search '|' in same group level
+    int lvl=gr_lvl;
+    char * p = src;
+    while (*p != '\0') {
+        if (*p == '|') {
+            if (gr_lvl == lvl) return p;
+        } else if (*p == '(') {
+            lvl++;
+        } else if (*p == ')') {
+            lvl--;
+        }
+        p++;
+    }
+    return NULL;
+}
 char * match(char * pattern, char * text, int gr_lvl) {
+    char * bar_pos, *left_pos = pattern, * bar_pattern, *p;
+    size_t bar_size;
     //if ( * pattern == '\0') return TRUE;
     if ( * pattern == '\0') return text;
     else if ( * pattern == '$' &&  * text  == '\0') {
         //return TRUE;
         return text; 
+    } else if ((bar_pos = search_1st_bar(pattern, gr_lvl)) != NULL) {
+        bar_size = bar_pos - pattern;
+        bar_pattern = (char *)malloc(sizeof(bar_size));
+        memcpy(bar_pattern, pattern, bar_size);
+        if ((p = match(bar_pattern,text,gr_lvl)) != NULL) return p;
+        return match(bar_pos+1,text,gr_lvl);
     } else if ( * (pattern + 1) == '?') {
         return match_q(pattern, text, gr_lvl); 
     } else if ( * (pattern + 1) == '*') {
