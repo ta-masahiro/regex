@@ -27,11 +27,11 @@ int match_s(char * pattern, char * text) {
 }
 int match_g(char * pattern, char * text){
     char * group_end = strchr(pattern, ')');
-    size_t group_size = group_end - pattern;
+    size_t group_size = group_end - pattern-1;
     char * group_pattern = (char*)malloc(sizeof(group_size));
     char * group_text = (char*)malloc(sizeof(group_size));
     char * remaind_pattern;
-    memcpy(group_pattern, pattern+1, group_size-1);
+    memcpy(group_pattern, pattern+1, group_size);
     memcpy(group_text, text, group_size);
     if (*(group_end + 1) =='?') {
         remaind_pattern = group_end+2;

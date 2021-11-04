@@ -26,10 +26,10 @@ int match_s(char * pattern, char * text, int gr_lvl) {
     return (match_1( * pattern,  * text) && (match(pattern, text + 1, gr_lvl))) || match(pattern + 2, text, gr_lvl); 
 }
 char * search_gr_end(char * src, int gr_lvl) {
-    char * p = src;
+    char * p = src+1;
     int lvl = gr_lvl;  
     while ( * p != '\0' ) {
-        if ( * p = '(') {
+        if ( * p == '(') {
             lvl ++ ;
         } else if (  * p == ')') {
             if (lvl == gr_lvl) return p; 
@@ -42,12 +42,13 @@ char * search_gr_end(char * src, int gr_lvl) {
 int match_g(char * pattern, char * text, int gr_lvl) {
     // char * group_end = strchr(pattern, ')');
     char * group_end = search_gr_end(pattern, gr_lvl); 
-    size_t group_size = group_end - pattern;
+    size_t group_size = group_end - pattern-1;
     char * group_pattern = (char*)malloc(sizeof(group_size));
     char * group_text = (char*)malloc(sizeof(group_size));
     char * remaind_pattern;
-    memcpy(group_pattern, pattern+1, group_size-1);
+    memcpy(group_pattern, pattern+1, group_size);
     memcpy(group_text, text, group_size);
+    //group_text=text;
     if (*(group_end + 1) =='?') {
         remaind_pattern = group_end+2;
         return  (match(group_pattern, group_text, gr_lvl) && match(remaind_pattern, text + group_size, gr_lvl)) ||
