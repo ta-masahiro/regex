@@ -15,6 +15,7 @@
 // $ 文字の末尾で一致
 // () グループ化
 //
+// ver0.41 . のバグ修正
 // ver0.40 []に対応  
 // TODO:
 // searchでわざわざ構造体を作って返すのをやめる
@@ -22,7 +23,8 @@
 // [...-...]、[^...]への対応
 int match_1(char p, char c) {
     if ( p == '\0') return TRUE; 
-    if ( c == '\0') return FALSE; 
+    if ( c == '\0') return FALSE;
+    if ( p == '.' ) return TRUE;
     return  p ==  c; 
 }
 char * match(char * , char * , int); 
@@ -142,8 +144,8 @@ char * match(char * pattern, char * text, int gr_lvl) {
         return match_q(pattern, text, gr_lvl); 
     } else if ( * (pattern + 1) == '*') {
         return match_s(pattern, text, gr_lvl); 
-    }else if ( * pattern == '.' &&  * text != '\0' ) {
-        return match(pattern + 1, text + 1, gr_lvl);
+    //}else if ( * pattern == '.' &&  * text != '\0' ) {
+    //    return match(pattern + 1, text + 1, gr_lvl);
     } else if ( * pattern == '(') {
         return match_g(pattern, text, gr_lvl + 1);
     } else if ( * pattern == '[') {
