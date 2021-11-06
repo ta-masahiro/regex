@@ -57,7 +57,7 @@ char * search_gr_end(char * src, int gr_lvl) {
 }
 char * match_g(char * pattern, char * text, int gr_lvl) {
     char * group_end = search_gr_end(pattern, gr_lvl); 
-    size_t group_size = group_end - pattern-1;
+    //size_t group_size = group_end - pattern-1;
     char * remaind_pattern,*p;
     memset(group_end,'\0',sizeof(char));
     if (*(group_end + 1) =='?') {
