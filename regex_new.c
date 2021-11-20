@@ -16,18 +16,21 @@
 // ^ 文字の先頭で一致
 // $ 文字の末尾で一致
 //
+// ver0.50 [...-...]への対応 null文字との一致に関するバグ対応
 // ver0.42 searchの構造体をやめた
 // ver0.41 . のバグ修正
 // ver0.40 []に対応  
 // TODO:
+// '(ab|abc)$' が 'abc'とマッチしない;()内で先にabとマッチしてしまう
 // '(.*)*'が必ずsegfoとなるバグ修正('(.*)?'はOK)
 // '((ABC)*ABC)*ABC'が'ABCABCABC'の前半 3文字としかmatchしないバグ修正（直せないと思う…）
 // エスケープ文字対応(現状「?*.|{}()^$」を含む文字列が検索できないので実用できない)
 // '+'対応(簡単だがA+はAA*で対応可能なので優先順序低くて可)
-// [...-...]、[^...]への対応（ないと不便)
+// [^...]への対応（ないと不便)　※暫定対応しているが大バグあり使えない
 // {n,m}の対応(使ったことないので優先低い?)
 // マルチバイト文字の対応（簡単にできそうな気もすれば作り直すレベルで難しいのかも…)
 int match_1(char p, char c) {
+    //if (( p=='\0') && (c=='\0')) return FALSE;
     if ( p == '\0') return TRUE; 
     if ( c == '\0') return FALSE;
     if ( p == '.' ) return TRUE;
@@ -91,28 +94,71 @@ char * match_g(char * pattern, char * text, int gr_lvl) {
 }
 char * match_b(char * pattern, char * text, int gr_lvl) {
     char * br_end = strchr(pattern, ']'); 
-    char * remaind_pattern,*p, *pp;
+    char * remaind_pattern,*p, *pp, c;
+    int flg;
     if (*(br_end + 1) =='?') {
         remaind_pattern = br_end+2;
-        for(pp = pattern+1; pp < br_end; pp++) {
-            if (match_1(*pp, *text)) {
-                if ((p=match(remaind_pattern, text+1, gr_lvl))!=NULL)  return p;
-            }
+        //for(pp = pattern+1; pp < br_end; pp++) {
+        //    if (match_1(*pp, *text)) {
+        //        if ((p=match(remaind_pattern, text+1, gr_lvl))!=NULL)  return p ;
+        //    }
+        //}
+        pp = pattern + 1;
+        if (*pp == '^') {flg = TRUE; pp++;} else flg=FALSE;
+        while (pp < br_end) {
+            if ((*(pp+1) == '-') && (pp+2 < br_end)) {
+                for (c = *pp; c<= *(pp+2); c++) {
+                    if (flg ^ match_1(c, *text)) {
+                        if ((p=match(remaind_pattern, text + 1, gr_lvl)) != NULL)  return p;
+                    }
+                }
+                pp = pp + 2;
+            }else if (flg ^ match_1(*pp, *text)) {
+                    if ((p = match(remaind_pattern, text + 1, gr_lvl)) != NULL)  return p;
+                }
+            pp ++;
         }
         return match(remaind_pattern,text, gr_lvl);
     } else if (*(br_end+1) == '*') {
         remaind_pattern = br_end+2;
-        for (pp = pattern + 1; pp < br_end; pp ++) {
-            if (match_1(*pp, *text)) {
-                if ((p = match(pattern, text + 1, gr_lvl)) != NULL)  return p;
-            }
+        //for (pp = pattern + 1; pp < br_end; pp ++) {
+        //    if (match_1(*pp, *text)) {
+        //        if ((p = match(pattern, text + 1, gr_lvl)) != NULL)  return p;
+        //    }
+        //}
+        pp = pattern + 1;
+        if (*pp == '^') {flg = TRUE; pp++;} else flg=FALSE;
+        while (pp < br_end) {
+            if ((*(pp+1) == '-') && (pp+2 < br_end)) {
+                for (c = *pp; c<= *(pp+2); c++) {
+                    if (flg ^ match_1(c, *text)) {
+                        if ((p=match(pattern, text + 1, gr_lvl)) != NULL)  return p;
+                    }
+                }
+                pp = pp + 2;
+            }else if (flg ^ match_1(*pp, *text)) {
+                    if ((p = match(pattern, text + 1, gr_lvl)) != NULL)  return p;
+                }
+            pp ++;
         }
         return match(remaind_pattern,text, gr_lvl);
     } else {
         remaind_pattern = br_end + 1;
-        for (pp = pattern + 1; pp < br_end; pp ++) {
-            if (match_1(*pp, *text)) return match(remaind_pattern, text+1, gr_lvl);
+        //for (pp = pattern + 1; pp < br_end; pp ++) {
+        //    if (match_1(*pp, *text)) return match(remaind_pattern, text+1, gr_lvl);
+        //}
+        pp = pattern + 1;
+        if (*pp == '^') {flg = TRUE; pp++;} else flg=FALSE;
+        while (pp < br_end) {
+            if ((*(pp+1) == '-') && (pp+2< br_end)) {
+                for (c = *pp; c< *(pp+2); c++) {
+                    if (flg ^ match_1(c, *text)) return match(remaind_pattern, text+1, gr_lvl);
+                }
+                pp = pp + 2;
+            }else if (flg ^ match_1(*pp, *text)) return match(remaind_pattern, text+1, gr_lvl);
+            pp ++;
         }
+
         return NULL;
     }
 }
@@ -163,7 +209,11 @@ void search(char * pattern, char * text, char **top, char **end) {
         else {*top=(char*)0; *end=(char*)0; return;}
     } else {
         while  (* text != '\0') {
-            if (p = match(pattern, text ++ , 0)) {*top = text-1; *end = p;return;} 
+            if (p = match(pattern, text ++ , 0)) {
+                *top = text-1;
+                *end = p;
+                if (*end != *top)return; // *top == *end はnullパターンとの一致なので
+            } 
         }
         *top = (char*)0;*end = (char*)0;
         return;             
