@@ -3,6 +3,7 @@
 #include <string.h>
 #define TRUE (1)
 #define FALSE (0)
+#define MAX(a, b) (a>=b ? a : b)
 // 簡易正規表現エンジン 
 // 元ネタは-> https://postd.cc/build-your-own-regex/
 // 上記に()の多重化、|、[]を付け加え、match部分のアドレスを返すように改定したもの
@@ -16,6 +17,7 @@
 // ^ 文字の先頭で一致
 // $ 文字の末尾で一致
 //
+// ver0.51 並列選択時もっとも長くmatchしたものを選ぶように修正
 // ver0.50 [...-...]への対応 null文字との一致に関するバグ対応
 // ver0.42 searchの構造体をやめた
 // ver0.41 . のバグ修正
@@ -67,19 +69,34 @@ char * search_gr_end(char * src, int gr_lvl) {
     return p; 
 }
 char * match_g(char * pattern, char * text, int gr_lvl) {
+    /* group match
+        '(' ')' でグループ化 */
     char * group_end = search_gr_end(pattern, gr_lvl); 
     char * remaind_pattern,*p;
     memset(group_end,'\0',sizeof(char));
-    if (*(group_end + 1) =='?') {
+    if (*(group_end + 1) =='?') {           // case of '?' : グループに0-1回match
         remaind_pattern = group_end+2;
         if ((p=match(pattern+1, text, gr_lvl)) != NULL) {
-            if ((p=match(remaind_pattern, p, gr_lvl))!=NULL) {memset(group_end,')',sizeof(char)); return p;}
+            if ((p=match(remaind_pattern, p, gr_lvl))!=NULL) {
+                memset(group_end,')',sizeof(char)); 
+                return p;
+            }
         }
         memset(group_end,')',sizeof(char));
         return match(remaind_pattern,text, gr_lvl);
-    } else if (*(group_end+1) == '*') {
+    /*
+    } else if (*(group_end+1) == '*') {     // case of '*' : グループに0回以上match
         remaind_pattern = group_end+2;
         if ((p=match(pattern+1, text, gr_lvl)) != NULL) {
+            memset(group_end,')',sizeof(char));
+            if ((p = match(pattern, p, gr_lvl)) != NULL) return p;
+        }
+        memset(group_end,')',sizeof(char));
+        return match(remaind_pattern, text, gr_lvl);
+    */
+    } else if (*(group_end+1) == '*') {     // case of '*' : グループに0回以上match
+        remaind_pattern = group_end+2;
+        while ((p=match(pattern+1, text, gr_lvl)) != NULL) {
             memset(group_end,')',sizeof(char));
             if ((p = match(pattern, p, gr_lvl)) != NULL) return p;
         }
@@ -179,18 +196,33 @@ char * search_1st_bar(char *src, int gr_lvl) {
 }
 int COUNT = 0;
 char * match(char * pattern, char * text, int gr_lvl) {
-    char * bar_pos, *left_pos = pattern, * bar_pattern, *p;
+    char * bar_pos, *left_pos = pattern, * bar_pattern, *p = NULL;
     size_t bar_size;
     COUNT++;
-    if ( * pattern == '\0') return text;
-    else if ( * pattern == '$' &&  * text  == '\0') {
+    if ( * pattern == '\0') {
+        return text;
+    } else if ( * pattern == '$' &&  * text  == '\0') {
         return text; 
+//    } else if ((bar_pos = search_1st_bar(pattern, gr_lvl)) != NULL) {
+//       bar_size = bar_pos - pattern;
+//        memset(bar_pos,'\0',sizeof(char));
+//        if ((p = match(pattern,text,gr_lvl)) != NULL) {memset(bar_pos,'|',sizeof(char)); return p;}
+//        memset(bar_pos,'|',sizeof(char));
+//        return match(bar_pos+1,text,gr_lvl);
     } else if ((bar_pos = search_1st_bar(pattern, gr_lvl)) != NULL) {
-        bar_size = bar_pos - pattern;
-        memset(bar_pos,'\0',sizeof(char));
-        if ((p = match(pattern,text,gr_lvl)) != NULL) {memset(bar_pos,'|',sizeof(char)); return p;}
-        memset(bar_pos,'|',sizeof(char));
-        return match(bar_pos+1,text,gr_lvl);
+        while (TRUE) {
+            bar_size = bar_pos - pattern;
+            memset(bar_pos,'\0',sizeof(char));
+            p = MAX(p, match(pattern, text, gr_lvl));
+            memset(bar_pos,'|',sizeof(char));
+            pattern = bar_pos + 1;
+            if ((bar_pos = search_1st_bar(pattern, gr_lvl)) == NULL) break;
+        }
+        p = MAX(p, match(pattern, text, gr_lvl));
+        
+        if (p != NULL) return p;
+        return text;
+
     } else if ( * (pattern + 1) == '?') {
         return match_q(pattern, text, gr_lvl); 
     } else if ( * (pattern + 1) == '*') {
@@ -200,7 +232,7 @@ char * match(char * pattern, char * text, int gr_lvl) {
     } else if ( * pattern == '[') {
         return match_b(pattern, text, gr_lvl);
     } else if (match_1( * pattern,  * text)) return match(pattern + 1, text + 1, gr_lvl); 
-    else return NULL;
+    return NULL;
 }
 void search(char * pattern, char * text, char **top, char **end) {
     char * p; 
@@ -225,5 +257,8 @@ int main(int argc, char * argv[]) {
     char * match_top,*match_end;
     search(pattern,text,&match_top, &match_end);
     if ((match_end - match_top) == 0) printf("Missed!: Count=%d\n",COUNT);
-    else printf("match in %ld to %ld: Count = %d\n",match_top - text, match_end - text,COUNT);
+    else {
+        * match_end = '\0';
+        printf("match in %ld to %ld text is \'%s\': Count = %d\n",match_top - text, match_end - text, match_top, COUNT);
+    }
 }
